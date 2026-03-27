@@ -18,7 +18,6 @@ def _issuer_from_supabase_url() -> str:
         return ""
     return f"{base}/auth/v1"
 
-
 def _jwks_client(base: str) -> PyJWKClient:
     jwks_url = f"{base.rstrip('/')}/auth/v1/.well-known/jwks.json"
     if jwks_url not in _jwks_clients:
