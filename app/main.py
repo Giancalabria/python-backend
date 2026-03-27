@@ -19,9 +19,25 @@ PARSER_VERSION = os.environ.get("PARSER_VERSION", "0.1.0")
 app = FastAPI(title="Finanzas statement parser", version=PARSER_VERSION)
 
 _origins = os.environ.get("CORS_ALLOW_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173")
+
+
+def _normalize_cors_origin(raw: str) -> str:
+    """Match browser Origin header: scheme + host, no trailing slash; bare host gets a sensible scheme."""
+    o = raw.strip().rstrip("/")
+    if not o:
+        return ""
+    if o.startswith(("http://", "https://")):
+        return o
+    if o.startswith("localhost") or o.startswith("127.0.0.1"):
+        return "http://" + o
+    return "https://" + o
+
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[o.strip() for o in _origins.split(",") if o.strip()],
+    allow_origins=[
+        n for n in (_normalize_cors_origin(o) for o in _origins.split(",")) if n
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

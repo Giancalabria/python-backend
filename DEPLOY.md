@@ -32,7 +32,7 @@ From the repository root, a `render.yaml` is provided. In Render: **New → Blue
 |----------|-------------|
 | `SUPABASE_JWT_SECRET` | Supabase → Project Settings → API → **JWT Secret** (not the anon key). |
 | `SUPABASE_JWT_AUDIENCE` | Usually `authenticated`. |
-| `CORS_ALLOW_ORIGINS` | Comma-separated browser origins, e.g. `https://your-app.vercel.app,http://localhost:5173` (no paths). |
+| `CORS_ALLOW_ORIGINS` | Comma-separated **origins** (what the browser sends in the `Origin` header): include `https://` and the host only — **no path, no trailing slash** after the host. Example: `http://localhost:5173,https://my-app.vercel.app`. You may omit `https://` for a hostname; it will be assumed. The API also strips trailing slashes on each entry. |
 
 Optional: `PARSER_VERSION` (e.g. `0.1.0`).
 
