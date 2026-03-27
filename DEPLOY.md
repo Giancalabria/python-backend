@@ -24,17 +24,23 @@ Render’s **default Python** template assumes **Django** and runs `gunicorn you
 
 ## Option 3 — Blueprint
 
-From the repository root, a `render.yaml` is provided. In Render: **New → Blueprint**, select the repo and apply. Set secret values when prompted (`SUPABASE_JWT_SECRET`, `CORS_ALLOW_ORIGINS`).
+From the repository root, a `render.yaml` is provided. In Render: **New → Blueprint**, select the repo and apply. Set secret values when prompted.
 
-## Required environment variables
+## Environment variables
 
-| Variable | Description |
-|----------|-------------|
-| `SUPABASE_JWT_SECRET` | Supabase → Project Settings → API → **JWT Secret** (not the anon key). |
-| `SUPABASE_JWT_AUDIENCE` | Usually `authenticated`. |
-| `CORS_ALLOW_ORIGINS` | Comma-separated **origins** (what the browser sends in the `Origin` header): include `https://` and the host only — **no path, no trailing slash** after the host. Example: `http://localhost:5173,https://my-app.vercel.app`. You may omit `https://` for a hostname; it will be assumed. The API also strips trailing slashes on each entry. |
+| Variable | Required? | Description |
+|----------|-------------|-------------|
+| **`SUPABASE_URL`** | **Yes** (for current Supabase) | Same as the frontend: `https://YOUR_PROJECT_REF.supabase.co` (no trailing slash). Used to load **JWKS** and verify **ES256** (ECC) access tokens. |
+| **`SUPABASE_JWT_SECRET`** | Optional | Only if tokens are still **HS256** (Legacy JWT Secret). New Supabase projects often use **ECC / ES256** only — then you **do not** rely on this for verification; **`SUPABASE_URL` is enough**. |
+| **`SUPABASE_JWT_AUDIENCE`** | Optional | Default `authenticated`. |
+| **`CORS_ALLOW_ORIGINS`** | Yes | Comma-separated **origins** (scheme + host, no path). Example: `http://localhost:5173,https://my-app.vercel.app`. Trailing slashes on hosts are normalized. |
 
 Optional: `PARSER_VERSION` (e.g. `0.1.0`).
+
+### JWT errors
+
+- **`The specified alg value is not allowed`** — Your token is **ES256**, but the server only tried **HS256**. Fix: set **`SUPABASE_URL`** on Render and redeploy (this repo verifies ES256 via JWKS automatically).
+- **`Invalid issuer`** — `SUPABASE_URL` must match the project that issued the token (same ref as in the frontend).
 
 ## Verify after deploy
 
