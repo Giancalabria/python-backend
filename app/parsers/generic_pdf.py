@@ -1,9 +1,8 @@
 import re
 from io import BytesIO
 
-import fitz
-
 from app.parsers import register
+from app.parsers.pdf_text import extract_pdf_text
 from app.schemas import ParseResult, ParseRow
 
 _LINE_RE = re.compile(
@@ -32,15 +31,10 @@ def _parse_amt(s: str) -> float | None:
 
 @register("generic", "pdf")
 def parse_generic_pdf(buf: BytesIO, bank_code: str) -> ParseResult:
-    warnings = [
-        "Generic PDF parser: best-effort line detection. Add a bank-specific parser for production statements.",
+    warnings: list[str] = [
+        "Generic PDF: line-based guess. For Patagonia or Macro Visa summaries, choose that bank in the app.",
     ]
-    doc = fitz.open(stream=buf.read(), filetype="pdf")
-    text = ""
-    for page in doc:
-        text += page.get_text() or ""
-    doc.close()
-
+    text = extract_pdf_text(buf)
     rows_out: list[ParseRow] = []
     dates: list[str] = []
     for line in text.splitlines():
@@ -61,6 +55,8 @@ def parse_generic_pdf(buf: BytesIO, bank_code: str) -> ParseResult:
         dates.append(d)
 
     period = {"from": min(dates) if dates else None, "to": max(dates) if dates else None}
+    if not rows_out:
+        warnings.append("No lines matched the generic pattern (date + description + amount).")
     return ParseResult(
         rows=rows_out,
         warnings=warnings,

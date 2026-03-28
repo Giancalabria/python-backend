@@ -10,6 +10,9 @@ from app.parsers import get_parser
 from app.schemas import ParseResult
 
 # Register parsers (side effects)
+import app.parsers.bank_macro_pdf  # noqa: F401, E402
+import app.parsers.bank_patagonia_pdf  # noqa: F401, E402
+import app.parsers.bank_santander_pdf  # noqa: F401, E402
 import app.parsers.generic_csv  # noqa: F401, E402
 import app.parsers.generic_pdf  # noqa: F401, E402
 import app.parsers.generic_xlsx  # noqa: F401, E402
