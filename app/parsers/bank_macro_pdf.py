@@ -3,6 +3,11 @@ Banco Macro — Visa credit card summary (Resumen PDF with CUIT 30-50000173-5 st
 
 Each movement is a multiline block: FECHA (DD-MM-YY), reference letter, description,
 optional cuota (NN/NN), comprobante, amount in pesos (AR format).
+
+Currency detection:
+  - Lines appearing before any "DÓLARES"/"DOLARES" section header → currency=None (ARS).
+  - Lines appearing after a "DÓLARES"/"DOLARES" section header → currency="USD".
+  - A "PESOS" section header resets back to ARS.
 """
 
 import re
@@ -20,6 +25,9 @@ _SKIP_DESC = re.compile(
     r"^(DETALLE|FECHA|REFERENCIA|CUOTA|COMPROBANTE|PESOS|DÓLARES|DOLARES|TARJETA|CONSOLIDADO|Resumen|Tarjeta|Consumidor|CUIT|Sucursal|N°|Página)",
     re.I,
 )
+# Section headers that switch the active currency
+_SECTION_USD = re.compile(r"^(DÓLARES|DOLARES|D[OÓ]LARES)\b", re.I)
+_SECTION_ARS = re.compile(r"^(PESOS)\b", re.I)
 
 
 def _macro_date_to_iso(d: str, m: str, y: str) -> str:
@@ -38,8 +46,21 @@ def _parse_macro_blocks(lines: list[str]) -> list[ParseRow]:
     rows: list[ParseRow] = []
     i = 0
     n = len(lines)
+    current_currency: str | None = None  # None = ARS (inherit from ParseResult)
+
     while i < n:
         raw = lines[i].strip()
+
+        # Track section headers to detect currency changes
+        if _SECTION_USD.match(raw):
+            current_currency = "USD"
+            i += 1
+            continue
+        if _SECTION_ARS.match(raw):
+            current_currency = None  # back to ARS
+            i += 1
+            continue
+
         dm = _DATE_LINE.match(raw)
         if not dm:
             i += 1
@@ -51,6 +72,8 @@ def _parse_macro_blocks(lines: list[str]) -> list[ParseRow]:
         while i < n:
             nxt = lines[i].strip()
             if _DATE_LINE.match(nxt):
+                break
+            if _SECTION_USD.match(nxt) or _SECTION_ARS.match(nxt):
                 break
             if nxt:
                 chunk.append(nxt)
@@ -97,6 +120,7 @@ def _parse_macro_blocks(lines: list[str]) -> list[ParseRow]:
                 date=date_iso,
                 description=re.sub(r"\s+", " ", description)[:500],
                 amount=amount,
+                currency=current_currency,
                 raw={"chunk": before + [chunk[amt_idx]]},
             )
         )

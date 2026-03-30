@@ -7,6 +7,10 @@ class ParseRow(BaseModel):
     date: str = Field(description="ISO date YYYY-MM-DD when possible")
     description: str = ""
     amount: float
+    currency: str | None = Field(
+        default=None,
+        description="Currency for this row. None means inherit from ParseResult.currency.",
+    )
     raw: dict[str, Any] | None = None
 
 
