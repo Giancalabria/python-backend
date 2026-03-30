@@ -16,6 +16,9 @@ import app.parsers.bank_santander_pdf  # noqa: F401, E402
 import app.parsers.generic_csv  # noqa: F401, E402
 import app.parsers.generic_pdf  # noqa: F401, E402
 import app.parsers.generic_xlsx  # noqa: F401, E402
+import app.parsers.mercadopago_csv  # noqa: F401, E402
+import app.parsers.mercadopago_pdf  # noqa: F401, E402
+import app.parsers.mercadopago_xlsx  # noqa: F401, E402
 
 PARSER_VERSION = os.environ.get("PARSER_VERSION", "0.1.0")
 

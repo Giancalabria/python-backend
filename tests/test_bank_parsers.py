@@ -9,6 +9,11 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
+MP_EXAMPLES = REPO_ROOT / "frontend" / "examples"
+MP_CSV = MP_EXAMPLES / "account_statement_931f5bdb-f444-4f51-a0d6-d9061ded3345-3.csv"
+MP_XLSX = MP_EXAMPLES / "account_statement_931f5bdb-f444-4f51-a0d6-d9061ded3345.xlsx"
+MP_PDF = MP_EXAMPLES / "downloadMobile_260330131410.pdf"
+
 
 def _first_pdf(glob_pat: str) -> Path | None:
     found = list(REPO_ROOT.glob(glob_pat))
@@ -89,3 +94,36 @@ def test_patagonia_parser(patagonia_pdf: Path | None) -> None:
     assert len(r.rows) >= 1
     for row in r.rows:
         assert row.currency in (None, "USD"), f"Unexpected currency on row: {row}"
+
+
+def test_mercadopago_csv_xlsx_pdf_same_expense_rows() -> None:
+    """Commit Mercado Pago exports in frontend/examples: CSV, XLSX, PDF share one dataset."""
+    if not MP_CSV.is_file() or not MP_XLSX.is_file() or not MP_PDF.is_file():
+        pytest.skip("Mercado Pago example files missing under frontend/examples")
+
+    from app.parsers.mercadopago_csv import parse_mercadopago_csv
+    from app.parsers.mercadopago_pdf import parse_mercadopago_pdf
+    from app.parsers.mercadopago_xlsx import parse_mercadopago_xlsx
+
+    c = parse_mercadopago_csv(BytesIO(MP_CSV.read_bytes()), "mercadopago")
+    x = parse_mercadopago_xlsx(BytesIO(MP_XLSX.read_bytes()), "mercadopago")
+    p = parse_mercadopago_pdf(BytesIO(MP_PDF.read_bytes()), "mercadopago")
+
+    assert len(c.rows) == 38
+    assert len(x.rows) == len(c.rows)
+    assert len(p.rows) == len(c.rows)
+
+    total = round(sum(r.amount for r in c.rows), 2)
+    assert total == 666_593.51
+    assert round(sum(r.amount for r in x.rows), 2) == total
+    assert round(sum(r.amount for r in p.rows), 2) == total
+
+    def sig(rows):
+        return {(r.date, r.raw.get("reference_id"), round(r.amount, 2)) for r in rows}
+
+    assert sig(c.rows) == sig(p.rows)
+
+    transfer_row = next(r for r in c.rows if "Salvay" in r.description)
+    assert transfer_row.date == "2026-02-02"
+    assert transfer_row.amount == 30_000.00
+    assert transfer_row.raw.get("reference_id") == "144494680302"
