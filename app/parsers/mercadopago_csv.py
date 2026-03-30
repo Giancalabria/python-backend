@@ -3,13 +3,38 @@
 from __future__ import annotations
 
 import csv
-from io import BytesIO, TextIOWrapper
+import io
+from io import BytesIO
 
 from app.parsers import register
 from app.parsers.mercadopago_common import mp_date_to_iso, parse_argentine_amount
 from app.schemas import ParseResult, ParseRow
 
 _TRANSACTION_HEADER = "RELEASE_DATE"
+_ENCODINGS = ("utf-8-sig", "utf-8", "latin-1", "cp1252")
+
+
+def _clean(s: str) -> str:
+    """Strip BOM remnants, non-breaking spaces, zero-width chars."""
+    return s.replace("\ufeff", "").replace("\u00a0", " ").replace("\u200b", "").strip()
+
+
+def _decode_and_parse(raw: bytes) -> tuple[list[list[str]], str]:
+    """Try several encodings; return (rows, encoding_used) for the first one
+    that successfully finds the RELEASE_DATE header."""
+    for enc in _ENCODINGS:
+        try:
+            text = raw.decode(enc)
+        except (UnicodeDecodeError, ValueError):
+            continue
+        reader = csv.reader(io.StringIO(text), delimiter=";")
+        rows = list(reader)
+        for row in rows:
+            if row and _clean(row[0]).upper() == _TRANSACTION_HEADER:
+                return rows, enc
+    # Fallback: latin-1 never fails, return whatever we get
+    text = raw.decode("latin-1")
+    return list(csv.reader(io.StringIO(text), delimiter=";")), "latin-1"
 
 
 @register("mercadopago", "csv")
@@ -18,18 +43,19 @@ def parse_mercadopago_csv(buf: BytesIO, bank_code: str) -> ParseResult:
     rows_out: list[ParseRow] = []
     dates: list[str] = []
 
-    text = TextIOWrapper(buf, encoding="utf-8-sig", newline="")
-    reader = csv.reader(text, delimiter=";")
-    data_rows = list(reader)
+    raw_bytes = buf.read()
+    data_rows, enc_used = _decode_and_parse(raw_bytes)
+    if enc_used != "utf-8-sig":
+        warnings.append(f"Archivo decodificado con {enc_used} (no UTF-8).")
 
     # Find transaction table: header row starting with RELEASE_DATE
     start_idx = None
     col_date = col_desc = col_amt = None
     for i, row in enumerate(data_rows):
-        if not row or not (row[0] or "").strip():
+        if not row or not _clean(row[0] or ""):
             continue
-        if (row[0] or "").strip().upper() == _TRANSACTION_HEADER:
-            hdr = [(c or "").strip().upper() for c in row]
+        if _clean(row[0] or "").upper() == _TRANSACTION_HEADER:
+            hdr = [_clean(c or "").upper() for c in row]
             try:
                 col_date = hdr.index("RELEASE_DATE")
                 col_desc = hdr.index("TRANSACTION_TYPE")
